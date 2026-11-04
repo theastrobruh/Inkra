@@ -2,6 +2,14 @@
 
 > A free, browser-based tool to arrange trading card proxies into print-ready, real-scale (1:1) grid layouts — no installation required.
 
+<p align="center">
+  <a href="https://theastrobruh.github.io/Inkra/">
+    <img src="https://img.shields.io/badge/%E2%96%B6%20Open%20Inkra-Try%20it%20now-4f46e5?style=for-the-badge&logoColor=white" alt="Open Inkra — try it now" height="44">
+  </a>
+</p>
+
+**→ Live app: [theastrobruh.github.io/Inkra](https://theastrobruh.github.io/Inkra/)**
+
 ![GitHub Actions](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)
 ![GitHub Pages](https://img.shields.io/badge/Hosted%20on-GitHub%20Pages-222?logo=github&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -25,7 +33,7 @@
 ## 🚀 Usage
 
 ### Online
-Open the live site → upload your card images → configure paper & card size → **Print / Save PDF**.
+**[Open Inkra →](https://theastrobruh.github.io/Inkra/)** then upload your card images → configure paper & card size → **Print / Save PDF**.
 
 ### Local
 Just open `inkra.html` in any modern browser. No server needed.
