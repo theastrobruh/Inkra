@@ -1,6 +1,6 @@
-# 🃏 Oricas Generator
+# 🖨️ Inkra
 
-> A free, browser-based tool to arrange trading card proxies (oricas) into print-ready, real-scale (1:1) grid layouts — no installation required.
+> A free, browser-based tool to arrange trading card proxies into print-ready, real-scale (1:1) grid layouts — no installation required.
 
 ![GitHub Actions](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)
 ![GitHub Pages](https://img.shields.io/badge/Hosted%20on-GitHub%20Pages-222?logo=github&logoColor=white)
