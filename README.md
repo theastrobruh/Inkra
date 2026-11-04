@@ -2,8 +2,10 @@
 
 > A free, browser-based tool to arrange trading card proxies (oricas) into print-ready, real-scale (1:1) grid layouts — no installation required.
 
-[![Deploy to GitHub Pages](https://github.com/YOUR_USERNAME/OricasGenerator/actions/workflows/deploy.yml/badge.svg)](https://github.com/YOUR_USERNAME/OricasGenerator/actions/workflows/deploy.yml)
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-indigo?logo=github)](https://YOUR_USERNAME.github.io/OricasGenerator/)
+![GitHub Actions](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)
+![GitHub Pages](https://img.shields.io/badge/Hosted%20on-GitHub%20Pages-222?logo=github&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
+![No dependencies](https://img.shields.io/badge/Dependencies-None-brightgreen)
 
 ---
 
@@ -65,4 +67,4 @@ Edit `oricas_generator.html` and push — GitHub Actions will deploy automatical
 
 ## 📄 License
 
-MIT © 2024 — Free to use and modify.
+MIT © 2026 — Free to use and modify.
