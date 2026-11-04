@@ -25,10 +25,10 @@
 ## 🚀 Usage
 
 ### Online
-Open the live site → upload your orica images → configure paper & card size → **Print / Save PDF**.
+Open the live site → upload your card images → configure paper & card size → **Print / Save PDF**.
 
 ### Local
-Just open `oricas_generator.html` in any modern browser. No server needed.
+Just open `inkra.html` in any modern browser. No server needed.
 
 ---
 
@@ -46,8 +46,8 @@ Just open `oricas_generator.html` in any modern browser. No server needed.
 ## 🗂️ Project Structure
 
 ```
-├── oricas_generator.html   # The entire app (HTML + CSS + JS, self-contained)
-├── index.html              # GitHub Pages entry point (redirects to the app)
+├── inkra.html              # The entire app (HTML + CSS + JS, self-contained)
+├── index.html              # GitHub Pages entry point (redirects to inkra.html)
 ├── README.md
 ├── .gitattributes
 ├── .gitignore
@@ -61,7 +61,7 @@ Just open `oricas_generator.html` in any modern browser. No server needed.
 ## 🛠️ Development
 
 Since this is a self-contained HTML file, there's no build step.  
-Edit `oricas_generator.html` and push — GitHub Actions will deploy automatically.
+Edit `inkra.html` and push — GitHub Actions will deploy automatically.
 
 ---
 
