@@ -1,0 +1,14 @@
+# OS / System
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs / Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local environment
+*.env
+*.env.local

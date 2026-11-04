@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oricas Generator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Estilos de impresión dinámicos */
+        @page {
+            size: auto;
+            margin: 0;
+        }
+
+        @media print {
+            body {
+                background: white !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-page {
+                box-shadow: none !important;
+                margin: 0 !important;
+                page-break-after: always;
+            }
+        }
+
+        .sheet-preview {
+            background: white;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            margin: 0 auto;
+            position: relative;
+            box-sizing: border-box;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .crop-marks {
+            outline: 1px dashed rgba(150, 150, 150, 0.8);
+            outline-offset: 0px;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Header Principal / Control Panel -->
+    <header class="no-print bg-slate-800 border-b border-slate-700 p-4 sticky top-0 z-50 shadow-md">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+            
+            <!-- Logo & Title -->
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 p-2.5 rounded-lg text-white">
+                    <i class="fa-solid fa-layer-group text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight text-white">Oricas Generator</h1>
+                    <p data-i18n="subtitle" class="text-xs text-slate-400">1:1 scale printable card grid layout tool</p>
+                </div>
+            </div>
+
+            <!-- Counter & Printing Metrics -->
+            <div class="flex items-center bg-slate-900/90 border border-slate-700 rounded-lg px-4 py-2 gap-4 text-xs">
+                <div>
+                    <span data-i18n="capacity_sheet" class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Capacity / Sheet</span>
+                    <span id="capacity-per-sheet" class="font-bold text-indigo-400 text-sm">0 cards</span>
+                </div>
+                <div class="h-6 w-px bg-slate-700"></div>
+                <div>
+                    <span data-i18n="total_cards" class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Total Cards</span>
+                    <span id="total-cards-count" class="font-bold text-emerald-400 text-sm">0</span>
+                </div>
+                <div class="h-6 w-px bg-slate-700"></div>
+                <div>
+                    <span data-i18n="total_pages" class="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Total Pages</span>
+                    <span id="total-pages-count" class="font-bold text-amber-400 text-sm">0</span>
+                </div>
+            </div>
+
+            <!-- Language Selector & Actions -->
+            <div class="flex items-center gap-3">
+                <!-- Language Selector -->
+                <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5">
+                    <i class="fa-solid fa-globe text-slate-400 text-xs"></i>
+                    <select id="lang-selector" onchange="changeLanguage(this.value)" class="bg-transparent text-xs text-white focus:outline-none cursor-pointer font-medium">
+                        <option value="en" class="bg-slate-800" selected>English</option>
+                        <option value="es" class="bg-slate-800">Español</option>
+                        <option value="de" class="bg-slate-800">Deutsch</option>
+                    </select>
+                </div>
+
+                <button onclick="clearAll()" class="px-3 py-2 bg-slate-700 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition flex items-center gap-2">
+                    <i class="fa-solid fa-trash-can"></i> <span data-i18n="btn_clear">Clear</span>
+                </button>
+                <button onclick="window.print()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg transition shadow-lg shadow-emerald-900/30 flex items-center gap-2">
+                    <i class="fa-solid fa-print"></i> <span data-i18n="btn_print">Print / Save PDF</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="flex-1 flex flex-col md:flex-row max-w-7xl w-full mx-auto p-4 gap-6">
+
+        <!-- Sidebar / Settings -->
+        <aside class="no-print w-full md:w-80 bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col gap-5 h-fit shadow-xl">
+            
+            <!-- Upload Images Zone -->
+            <div>
+                <label data-i18n="step_1" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">1. Upload Images</label>
+                <div id="drop-zone" class="border-2 border-dashed border-slate-600 hover:border-indigo-500 bg-slate-900/50 hover:bg-slate-900/80 rounded-xl p-4 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2">
+                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-indigo-400"></i>
+                    <span data-i18n="drag_drop" class="text-xs text-slate-300 font-medium">Click or drag your oricas here</span>
+                    <span data-i18n="supported_formats" class="text-[10px] text-slate-500">Supports PNG, JPG, WEBP (Multiple)</span>
+                    <input type="file" id="file-input" multiple accept="image/*" class="hidden">
+                </div>
+            </div>
+
+            <!-- Paper Format & Orientation -->
+            <div>
+                <label data-i18n="step_2" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">2. Paper Format</label>
+                <div class="space-y-2">
+                    <div>
+                        <span data-i18n="paper_size" class="text-[11px] text-slate-400">Paper Size</span>
+                        <select id="paper-format" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 mt-1">
+                            <option value="A4" selected>A4 (210 x 297 mm)</option>
+                            <option value="LETTER">Letter / US Letter (215.9 x 279.4 mm)</option>
+                            <option value="LEGAL">Legal / Oficio (215.9 x 355.6 mm)</option>
+                            <option value="A3">A3 (297 x 420 mm)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span data-i18n="orientation" class="text-[11px] text-slate-400">Orientation</span>
+                        <div class="grid grid-cols-2 gap-2 mt-1">
+                            <button type="button" onclick="setOrientation('portrait')" id="btn-portrait" class="px-2 py-1.5 rounded border border-indigo-500 bg-indigo-600/30 text-indigo-300 font-medium text-xs flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-file"></i> <span data-i18n="portrait">Portrait</span>
+                            </button>
+                            <button type="button" onclick="setOrientation('landscape')" id="btn-landscape" class="px-2 py-1.5 rounded border border-slate-700 hover:bg-slate-700 text-slate-300 text-xs flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-file rotate-90"></i> <span data-i18n="landscape">Landscape</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card Presets & Dimensions -->
+            <div>
+                <label data-i18n="step_3" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">3. Card Size</label>
+                <div class="space-y-2">
+                    <div>
+                        <span data-i18n="card_preset" class="text-[11px] text-slate-400">Game Presets</span>
+                        <select id="card-preset" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 mt-1">
+                            <option value="59,86" selected>Cardfight!! Vanguard (59x86 mm)</option>
+                            <option value="59,86">Yu-Gi-Oh! (59x86 mm)</option>
+                            <option value="63,88">Pokémon / Magic / Lorcana (63x88 mm)</option>
+                            <option value="70,120">Tarot Card (70x120 mm)</option>
+                            <option value="44,68">Mini Euro / Board Games (44x68 mm)</option>
+                            <option value="custom" data-i18n="custom_preset">Custom...</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 pt-1">
+                        <div>
+                            <span data-i18n="width" class="text-[11px] text-slate-400">Width (mm)</span>
+                            <input type="number" id="card-width" value="59" step="0.5" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <span data-i18n="height" class="text-[11px] text-slate-400">Height (mm)</span>
+                            <input type="number" id="card-height" value="86" step="0.5" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Layout Options -->
+            <div>
+                <label data-i18n="step_4" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">4. Margins & Spacing</label>
+                
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <div class="flex justify-between text-slate-400 mb-1">
+                            <span data-i18n="card_gap">Card Spacing (mm)</span>
+                            <span id="gap-val">0</span>
+                        </div>
+                        <input type="range" id="card-gap" min="0" max="10" value="0" step="0.5" class="w-full accent-indigo-500">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-slate-400 mb-1">
+                            <span data-i18n="margin_v">Vertical Margin (mm)</span>
+                            <span id="margin-v-val">10</span>
+                        </div>
+                        <input type="range" id="margin-v" min="0" max="30" value="10" step="1" class="w-full accent-indigo-500">
+                    </div>
+
+                    <div class="flex items-center justify-between pt-1">
+                        <span data-i18n="crop_marks" class="text-slate-300">Show crop marks</span>
+                        <input type="checkbox" id="toggle-crop" checked class="w-4 h-4 accent-indigo-600 rounded cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Printing Tips -->
+            <div class="bg-indigo-950/40 border border-indigo-800/40 rounded-lg p-3 text-[11px] text-indigo-300 space-y-1.5">
+                <p data-i18n="print_tips_title" class="font-semibold text-indigo-200"><i class="fa-solid fa-circle-info"></i> Printing Tips:</p>
+                <ul class="list-disc list-inside space-y-1 text-indigo-300/80">
+                    <li data-i18n="tip_1">When printing, set **"Scale: 100%"** or **"Actual Size"**.</li>
+                    <li data-i18n="tip_2">Ensure printer paper size matches the setting chosen here.</li>
+                </ul>
+            </div>
+
+        </aside>
+
+        <!-- Document Preview -->
+        <main class="flex-1 flex flex-col items-center overflow-auto p-2">
+            <div id="pages-container" class="space-y-8">
+                <!-- Pages render dynamically here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Script and Translation Engine -->
+    <script>
+        // Dictionary Translations (i18n)
+        const i18n = {
+            en: {
+                subtitle: "1:1 scale printable card grid layout tool",
+                capacity_sheet: "Capacity / Sheet",
+                total_cards: "Total Cards",
+                total_pages: "Total Pages",
+                btn_clear: "Clear",
+                btn_print: "Print / Save PDF",
+                step_1: "1. Upload Images",
+                drag_drop: "Click or drag your oricas here",
+                supported_formats: "Supports PNG, JPG, WEBP (Multiple)",
+                step_2: "2. Paper Format",
+                paper_size: "Paper Size",
+                orientation: "Orientation",
+                portrait: "Portrait",
+                landscape: "Landscape",
+                step_3: "3. Card Size",
+                card_preset: "Game Presets",
+                custom_preset: "Custom...",
+                width: "Width (mm)",
+                height: "Height (mm)",
+                step_4: "4. Margins & Spacing",
+                card_gap: "Card Spacing (mm)",
+                margin_v: "Vertical Margin (mm)",
+                crop_marks: "Show crop marks",
+                print_tips_title: "Printing Tips:",
+                tip_1: 'When printing, set "Scale: 100%" or "Actual Size".',
+                tip_2: "Ensure printer paper size matches the setting chosen here.",
+                no_cards_title: "No cards added yet.",
+                no_cards_desc: "Use the left panel to upload orica images.",
+                sheet_capacity: "Sheet Capacity",
+                cards_unit: "cards",
+                duplicate: "Duplicate",
+                delete: "Delete"
+            },
+            es: {
+                subtitle: "Herramienta de distribución de cartas a escala real 1:1 para impresión",
+                capacity_sheet: "Capacidad / Hoja",
+                total_cards: "Total Cartas",
+                total_pages: "Hojas Totales",
+                btn_clear: "Limpiar",
+                btn_print: "Imprimir / Guardar PDF",
+                step_1: "1. Cargar Imágenes",
+                drag_drop: "Haz clic o arrastra tus oricas aquí",
+                supported_formats: "Admite PNG, JPG, WEBP (Múltiples)",
+                step_2: "2. Formato de Papel",
+                paper_size: "Tamaño del Papel",
+                orientation: "Orientación",
+                portrait: "Vertical",
+                landscape: "Horizontal",
+                step_3: "3. Tamaño de Carta",
+                card_preset: "Presets de Juegos",
+                custom_preset: "Personalizado...",
+                width: "Ancho (mm)",
+                height: "Alto (mm)",
+                step_4: "4. Margen y Espaciado",
+                card_gap: "Separación entre cartas (mm)",
+                margin_v: "Margen Vertical (mm)",
+                crop_marks: "Mostrar guías de corte",
+                print_tips_title: "Consejos de Impresión:",
+                tip_1: 'Al imprimir, selecciona "Escala: 100%" o "Tamaño Real".',
+                tip_2: "Verifica que el papel de tu impresora coincida con el elegido.",
+                no_cards_title: "No has agregado ninguna carta aún.",
+                no_cards_desc: "Usa el panel lateral para subir imágenes de tus oricas.",
+                sheet_capacity: "Capacidad de la hoja",
+                cards_unit: "cartas",
+                duplicate: "Duplicar",
+                delete: "Eliminar"
+            },
+            de: {
+                subtitle: "1:1 Druck-Layout-Werkzeug für Karten-Prototypen",
+                capacity_sheet: "Kapazität / Blatt",
+                total_cards: "Gesamte Karten",
+                total_pages: "Gesamte Seiten",
+                btn_clear: "Löschen",
+                btn_print: "Drucken / PDF Speichern",
+                step_1: "1. Bilder Hochladen",
+                drag_drop: "Klicken oder ziehen Sie Ihre Oricas hierher",
+                supported_formats: "Unterstützt PNG, JPG, WEBP (Mehrere)",
+                step_2: "2. Papierformat",
+                paper_size: "Papiergröße",
+                orientation: "Ausrichtung",
+                portrait: "Hochformat",
+                landscape: "Querformat",
+                step_3: "3. Kartengröße",
+                card_preset: "Spiel-Voreinstellungen",
+                custom_preset: "Benutzerdefiniert...",
+                width: "Breite (mm)",
+                height: "Höhe (mm)",
+                step_4: "4. Ränder & Abstand",
+                card_gap: "Kartenabstand (mm)",
+                margin_v: "Vertikaler Rand (mm)",
+                crop_marks: "Schnittmarken anzeigen",
+                print_tips_title: "Drucktipps:",
+                tip_1: 'Beim Drucken "Skalierung: 100%" oder "Tatsächliche Größe" wählen.',
+                tip_2: "Stellen Sie sicher, dass das Druckerpapier mit der Einstellung übereinstimmt.",
+                no_cards_title: "Noch keine Karten hinzugefügt.",
+                no_cards_desc: "Nutzen Sie das linke Menü zum Hochladen Ihrer Bilder.",
+                sheet_capacity: "Blattkapazität",
+                cards_unit: "Karten",
+                duplicate: "Duplizieren",
+                delete: "Löschen"
+            }
+        };
+
+        let currentLang = 'en';
+
+        function changeLanguage(lang) {
+            currentLang = lang;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (i18n[lang] && i18n[lang][key]) {
+                    el.textContent = i18n[lang][key];
+                }
+            });
+            renderCards();
+        }
+
+        // Standard Sheet Dimensions (Width x Height in portrait, mm)
+        const PAPER_SIZES = {
+            'A4': { width: 210, height: 297 },
+            'LETTER': { width: 215.9, height: 279.4 },
+            'LEGAL': { width: 215.9, height: 355.6 },
+            'A3': { width: 297, height: 420 }
+        };
+
+        // Application State
+        let imagesList = [];
+        let currentOrientation = 'portrait';
+
+        // DOM Elements
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const paperFormatSelect = document.getElementById('paper-format');
+        const cardPresetSelect = document.getElementById('card-preset');
+        const cardWidthInput = document.getElementById('card-width');
+        const cardHeightInput = document.getElementById('card-height');
+        const cardGapInput = document.getElementById('card-gap');
+        const marginVInput = document.getElementById('margin-v');
+        const toggleCrop = document.getElementById('toggle-crop');
+
+        // Event Listeners
+        paperFormatSelect.addEventListener('change', renderCards);
+        cardPresetSelect.addEventListener('change', (e) => {
+            if (e.target.value !== 'custom') {
+                const [w, h] = e.target.value.split(',').map(Number);
+                cardWidthInput.value = w;
+                cardHeightInput.value = h;
+            }
+            renderCards();
+        });
+
+        cardWidthInput.addEventListener('input', () => {
+            cardPresetSelect.value = 'custom';
+            renderCards();
+        });
+        cardHeightInput.addEventListener('input', () => {
+            cardPresetSelect.value = 'custom';
+            renderCards();
+        });
+
+        cardGapInput.addEventListener('input', (e) => {
+            document.getElementById('gap-val').innerText = e.target.value;
+            renderCards();
+        });
+        marginVInput.addEventListener('input', (e) => {
+            document.getElementById('margin-v-val').innerText = e.target.value;
+            renderCards();
+        });
+        toggleCrop.addEventListener('change', renderCards);
+
+        function setOrientation(orientation) {
+            currentOrientation = orientation;
+            const btnPortrait = document.getElementById('btn-portrait');
+            const btnLandscape = document.getElementById('btn-landscape');
+
+            if (orientation === 'portrait') {
+                btnPortrait.className = "px-2 py-1.5 rounded border border-indigo-500 bg-indigo-600/30 text-indigo-300 font-medium text-xs flex items-center justify-center gap-1";
+                btnLandscape.className = "px-2 py-1.5 rounded border border-slate-700 hover:bg-slate-700 text-slate-300 text-xs flex items-center justify-center gap-1";
+            } else {
+                btnLandscape.className = "px-2 py-1.5 rounded border border-indigo-500 bg-indigo-600/30 text-indigo-300 font-medium text-xs flex items-center justify-center gap-1";
+                btnPortrait.className = "px-2 py-1.5 rounded border border-slate-700 hover:bg-slate-700 text-slate-300 text-xs flex items-center justify-center gap-1";
+            }
+            renderCards();
+        }
+
+        // Drag & Drop Handlers
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-indigo-500', 'bg-indigo-950/20');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-indigo-500', 'bg-indigo-950/20');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-indigo-500', 'bg-indigo-950/20');
+            if (e.dataTransfer.files.length) {
+                handleFiles(e.dataTransfer.files);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFiles(e.target.files);
+            }
+        });
+
+        function handleFiles(files) {
+            Array.from(files).forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        imagesList.push(e.target.result);
+                        renderCards();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        function removeCard(index) {
+            imagesList.splice(index, 1);
+            renderCards();
+        }
+
+        function duplicateCard(index) {
+            imagesList.splice(index, 0, imagesList[index]);
+            renderCards();
+        }
+
+        function clearAll() {
+            imagesList = [];
+            renderCards();
+        }
+
+        // Dynamic Print Styles Injection
+        function updatePrintStyles(sheetW, sheetH) {
+            let printStyleEl = document.getElementById('dynamic-print-style');
+            if (!printStyleEl) {
+                printStyleEl = document.createElement('style');
+                printStyleEl.id = 'dynamic-print-style';
+                document.head.appendChild(printStyleEl);
+            }
+            printStyleEl.innerHTML = `
+                @media print {
+                    @page {
+                        size: ${sheetW}mm ${sheetH}mm;
+                        margin: 0;
+                    }
+                    .sheet-preview {
+                        width: ${sheetW}mm !important;
+                        height: ${sheetH}mm !important;
+                    }
+                }
+            `;
+        }
+
+        function renderCards() {
+            const lang = i18n[currentLang];
+            const paperType = paperFormatSelect.value;
+            const paperDim = PAPER_SIZES[paperType] || PAPER_SIZES['A4'];
+            
+            const sheetW = currentOrientation === 'portrait' ? paperDim.width : paperDim.height;
+            const sheetH = currentOrientation === 'portrait' ? paperDim.height : paperDim.width;
+
+            const width = parseFloat(cardWidthInput.value) || 59;
+            const height = parseFloat(cardHeightInput.value) || 86;
+            const gap = parseFloat(cardGapInput.value) || 0;
+            const marginV = parseFloat(marginVInput.value) || 10;
+            const showCrop = toggleCrop.checked;
+
+            updatePrintStyles(sheetW, sheetH);
+
+            const pagesContainer = document.getElementById('pages-container');
+            pagesContainer.innerHTML = '';
+
+            const printableWidth = sheetW - 10;
+            const printableHeight = sheetH - (marginV * 2);
+
+            const cols = Math.max(1, Math.floor((printableWidth + gap) / (width + gap)));
+            const rows = Math.max(1, Math.floor((printableHeight + gap) / (height + gap)));
+            const cardsPerPage = cols * rows;
+
+            document.getElementById('capacity-per-sheet').innerText = `${cardsPerPage} ${lang.cards_unit} (${cols}x${rows})`;
+            document.getElementById('total-cards-count').innerText = imagesList.length;
+            const totalPages = Math.ceil(imagesList.length / cardsPerPage) || 0;
+            document.getElementById('total-pages-count').innerText = totalPages;
+
+            if (imagesList.length === 0) {
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'sheet-preview print-page p-4 flex flex-col items-center justify-center text-slate-400';
+                emptyDiv.style.width = `${sheetW}mm`;
+                emptyDiv.style.height = `${sheetH}mm`;
+                emptyDiv.innerHTML = `
+                    <i class="fa-solid fa-images text-5xl mb-3 text-slate-300"></i>
+                    <p class="font-medium text-sm">${lang.no_cards_title}</p>
+                    <p class="text-xs text-slate-400 mt-1">${lang.no_cards_desc}</p>
+                    <span class="mt-4 px-3 py-1 bg-slate-100 border text-slate-600 rounded text-xs font-semibold">
+                        ${lang.sheet_capacity} (${paperType}): ${cardsPerPage} ${lang.cards_unit}
+                    </span>
+                `;
+                pagesContainer.appendChild(emptyDiv);
+                return;
+            }
+
+            for (let i = 0; i < imagesList.length; i += cardsPerPage) {
+                const pageImages = imagesList.slice(i, i + cardsPerPage);
+                
+                const pageDiv = document.createElement('div');
+                pageDiv.className = 'sheet-preview print-page flex flex-col items-center justify-start';
+                pageDiv.style.width = `${sheetW}mm`;
+                pageDiv.style.height = `${sheetH}mm`;
+                pageDiv.style.paddingTop = `${marginV}mm`;
+                pageDiv.style.paddingBottom = `${marginV}mm`;
+
+                const grid = document.createElement('div');
+                grid.className = 'flex flex-wrap justify-center content-start';
+                grid.style.gap = `${gap}mm`;
+                grid.style.width = '100%';
+
+                pageImages.forEach((imgSrc, idx) => {
+                    const globalIdx = i + idx;
+                    const cardWrapper = document.createElement('div');
+                    cardWrapper.className = `relative group ${showCrop ? 'crop-marks' : ''}`;
+                    cardWrapper.style.width = `${width}mm`;
+                    cardWrapper.style.height = `${height}mm`;
+
+                    cardWrapper.innerHTML = `
+                        <img src="${imgSrc}" class="w-full h-full object-cover" style="display:block;">
+                        <div class="no-print absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                            <button onclick="duplicateCard(${globalIdx})" title="${lang.duplicate}" class="p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow">
+                                <i class="fa-solid fa-copy text-xs"></i>
+                            </button>
+                            <button onclick="removeCard(${globalIdx})" title="${lang.delete}" class="p-2 bg-red-600 hover:bg-red-500 text-white rounded-full shadow">
+                                <i class="fa-solid fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                    `;
+
+                    grid.appendChild(cardWrapper);
+                });
+
+                pageDiv.appendChild(grid);
+                pagesContainer.appendChild(pageDiv);
+            }
+        }
+
+        // Initial render
+        renderCards();
+    </script>
+</body>
+</html>
