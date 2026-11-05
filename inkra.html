@@ -1,13 +1,20 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inkra</title>
+    <title>Inkra — Printable Card Proxy Studio</title>
+    <meta name="application-name" content="Inkra">
+    <meta name="description" content="Inkra — create print-ready 1:1 scale trading card proxies, search cards online and export a real-size PDF.">
+    <meta property="og:site_name" content="Inkra">
+    <meta property="og:title" content="Inkra — Printable Card Proxy Studio">
+    <meta property="og:description" content="Search cards online, arrange them on real-size sheets and download a print-ready PDF.">
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- PDF engine (local, so PDF export does not depend on a third-party CDN) -->
+    <script src="vendor/jspdf.umd.min.js"></script>
     <style>
         /* Estilos de impresión dinámicos */
         @page {
@@ -16,10 +23,12 @@
         }
 
         @media print {
-            body {
+            html, body {
                 background: white !important;
                 padding: 0 !important;
                 margin: 0 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
             .no-print {
                 display: none !important;
@@ -28,6 +37,10 @@
                 box-shadow: none !important;
                 margin: 0 !important;
                 page-break-after: always;
+                page-break-inside: avoid;
+            }
+            .print-page:last-child {
+                page-break-after: auto;
             }
         }
 
@@ -45,6 +58,18 @@
             outline: 1px dashed rgba(150, 150, 150, 0.8);
             outline-offset: 0px;
         }
+
+        /* Thin scrollbar for the search results panel */
+        .thin-scroll::-webkit-scrollbar { width: 6px; }
+        .thin-scroll::-webkit-scrollbar-track { background: transparent; }
+        .thin-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 999px; }
+        .thin-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        @keyframes inkra-fade-up {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .inkra-fade-up { animation: inkra-fade-up .18s ease-out; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
@@ -52,7 +77,7 @@
     <!-- Header Principal / Control Panel -->
     <header class="no-print bg-slate-800 border-b border-slate-700 p-4 sticky top-0 z-50 shadow-md">
         <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-            
+
             <!-- Logo & Title -->
             <div class="flex items-center gap-3">
                 <div class="bg-indigo-600 p-2.5 rounded-lg text-white">
@@ -83,7 +108,7 @@
             </div>
 
             <!-- Language Selector & Actions -->
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center gap-2">
                 <!-- Language Selector -->
                 <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5">
                     <i class="fa-solid fa-globe text-slate-400 text-xs"></i>
@@ -97,8 +122,11 @@
                 <button onclick="clearAll()" class="px-3 py-2 bg-slate-700 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition flex items-center gap-2">
                     <i class="fa-solid fa-trash-can"></i> <span data-i18n="btn_clear">Clear</span>
                 </button>
-                <button onclick="window.print()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg transition shadow-lg shadow-emerald-900/30 flex items-center gap-2">
-                    <i class="fa-solid fa-print"></i> <span data-i18n="btn_print">Print / Save PDF</span>
+                <button onclick="window.print()" class="px-3 py-2 bg-slate-600 hover:bg-slate-500 text-white text-xs font-semibold rounded-lg transition flex items-center gap-2" title="Print with the browser dialog">
+                    <i class="fa-solid fa-print"></i> <span data-i18n="btn_print">Print</span>
+                </button>
+                <button id="btn-download-pdf" onclick="downloadPDF()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg transition shadow-lg shadow-emerald-900/30 flex items-center gap-2">
+                    <i class="fa-solid fa-file-pdf"></i> <span data-i18n="btn_pdf">Download PDF</span>
                 </button>
             </div>
         </div>
@@ -109,15 +137,64 @@
 
         <!-- Sidebar / Settings -->
         <aside class="no-print w-full md:w-80 bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col gap-5 h-fit shadow-xl">
-            
-            <!-- Upload Images Zone -->
+
+            <!-- Add Cards Zone -->
             <div>
-                <label data-i18n="step_1" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">1. Upload Images</label>
-                <div id="drop-zone" class="border-2 border-dashed border-slate-600 hover:border-indigo-500 bg-slate-900/50 hover:bg-slate-900/80 rounded-xl p-4 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2">
-                    <i class="fa-solid fa-cloud-arrow-up text-3xl text-indigo-400"></i>
-                    <span data-i18n="drag_drop" class="text-xs text-slate-300 font-medium">Click or drag your cards here</span>
-                    <span data-i18n="supported_formats" class="text-[10px] text-slate-500">Supports PNG, JPG, WEBP (Multiple)</span>
-                    <input type="file" id="file-input" multiple accept="image/*" class="hidden">
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2" data-i18n="step_1">1. Add Cards</label>
+
+                <!-- Source tabs -->
+                <div class="grid grid-cols-2 gap-1 bg-slate-900 p-1 rounded-lg mb-3">
+                    <button id="tab-btn-upload" type="button" class="px-2 py-1.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 bg-indigo-600/30 text-indigo-200 border border-indigo-500/60">
+                        <i class="fa-solid fa-arrow-up-from-bracket"></i> <span data-i18n="tab_upload">Upload</span>
+                    </button>
+                    <button id="tab-btn-online" type="button" class="px-2 py-1.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 text-slate-300 border border-transparent hover:bg-slate-700">
+                        <i class="fa-solid fa-magnifying-glass"></i> <span data-i18n="tab_online">Search online</span>
+                    </button>
+                </div>
+
+                <!-- Local upload -->
+                <div id="upload-panel">
+                    <div id="drop-zone" class="border-2 border-dashed border-slate-600 hover:border-indigo-500 bg-slate-900/50 hover:bg-slate-900/80 rounded-xl p-4 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-up text-3xl text-indigo-400"></i>
+                        <span data-i18n="drag_drop" class="text-xs text-slate-300 font-medium">Click or drag your cards here</span>
+                        <span data-i18n="supported_formats" class="text-[10px] text-slate-500">Supports PNG, JPG, WEBP (Multiple)</span>
+                        <input type="file" id="file-input" multiple accept="image/*" class="hidden">
+                    </div>
+                </div>
+
+                <!-- Online search -->
+                <div id="search-panel" class="hidden space-y-2.5">
+                    <div>
+                        <label for="search-game" class="text-[11px] text-slate-400" data-i18n="search_game">Game</label>
+                        <select id="search-game" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500 mt-1">
+                            <option value="mtg">Magic: The Gathering</option>
+                            <option value="pokemon">Pokémon TCG</option>
+                            <option value="yugioh">Yu-Gi-Oh!</option>
+                            <option value="lorcana">Disney Lorcana</option>
+                        </select>
+                    </div>
+
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none"></i>
+                        <input type="search" id="card-search" autocomplete="off" spellcheck="false" data-i18n-placeholder="search_placeholder" placeholder="Search by card name…" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 pl-8 pr-8 text-xs text-white focus:outline-none focus:border-indigo-500">
+                        <button id="search-clear" type="button" class="hidden absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-white" title="Clear search">
+                            <i class="fa-solid fa-xmark text-xs"></i>
+                        </button>
+                    </div>
+
+                    <div id="search-status" class="text-[10px] text-slate-400 min-h-[14px]"></div>
+
+                    <div id="search-results" class="grid grid-cols-2 gap-2 max-h-[430px] overflow-y-auto thin-scroll pr-0.5"></div>
+
+                    <button id="search-more" type="button" class="hidden w-full px-2 py-1.5 rounded border border-slate-600 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold transition" data-i18n="load_more">Load more</button>
+
+                    <details class="pt-1 border-t border-slate-700/70">
+                        <summary class="text-[10px] text-slate-400 cursor-pointer hover:text-slate-200 select-none pt-2" data-i18n="add_url">Or paste an image URL</summary>
+                        <div class="flex gap-1.5 mt-2">
+                            <input type="url" id="image-url" data-i18n-placeholder="add_url_placeholder" placeholder="https://…/card.jpg" class="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-[11px] text-white focus:outline-none focus:border-indigo-500">
+                            <button id="add-url-btn" type="button" class="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-[11px] font-semibold rounded transition" data-i18n="add_url_btn">Add</button>
+                        </div>
+                    </details>
                 </div>
             </div>
 
@@ -180,7 +257,7 @@
             <!-- Layout Options -->
             <div>
                 <label data-i18n="step_4" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">4. Margins & Spacing</label>
-                
+
                 <div class="space-y-3 text-xs">
                     <div>
                         <div class="flex justify-between text-slate-400 mb-1">
@@ -207,10 +284,11 @@
 
             <!-- Printing Tips -->
             <div class="bg-indigo-950/40 border border-indigo-800/40 rounded-lg p-3 text-[11px] text-indigo-300 space-y-1.5">
-                <p data-i18n="print_tips_title" class="font-semibold text-indigo-200"><i class="fa-solid fa-circle-info"></i> Printing Tips:</p>
+                <p class="font-semibold text-indigo-200"><i class="fa-solid fa-circle-info"></i> <span data-i18n="print_tips_title">Printing Tips:</span></p>
                 <ul class="list-disc list-inside space-y-1 text-indigo-300/80">
                     <li data-i18n="tip_1">When printing, set **"Scale: 100%"** or **"Actual Size"**.</li>
                     <li data-i18n="tip_2">Ensure printer paper size matches the setting chosen here.</li>
+                    <li data-i18n="tip_3">Use Download PDF to get a real-size file for USB or sharing.</li>
                 </ul>
             </div>
 
@@ -224,20 +302,58 @@
         </main>
     </div>
 
+    <!-- PDF progress overlay -->
+    <div id="pdf-overlay" class="hidden fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm items-center justify-center p-4">
+        <div class="w-full max-w-sm bg-slate-800 border border-slate-600 rounded-2xl p-6 shadow-2xl text-center inkra-fade-up">
+            <div class="mx-auto mb-4 w-12 h-12 rounded-full bg-emerald-600/20 text-emerald-400 flex items-center justify-center">
+                <i class="fa-solid fa-file-pdf text-xl"></i>
+            </div>
+            <h2 class="text-sm font-bold text-white mb-1">Inkra</h2>
+            <p id="pdf-status" class="text-xs text-slate-300">Preparing PDF…</p>
+            <div class="w-full h-2 bg-slate-700 rounded-full mt-4 overflow-hidden">
+                <div id="pdf-progress-bar" class="h-full bg-emerald-500 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <p id="pdf-detail" class="text-[10px] text-slate-400 mt-2">&nbsp;</p>
+        </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-[120] flex flex-col items-end gap-2 pointer-events-none"></div>
+
     <!-- Script and Translation Engine -->
     <script>
         // Dictionary Translations (i18n)
         const i18n = {
             en: {
-                subtitle: "1:1 scale printable card grid layout tool",
+                subtitle: "1:1 scale printable card proxy studio",
                 capacity_sheet: "Capacity / Sheet",
                 total_cards: "Total Cards",
                 total_pages: "Total Pages",
                 btn_clear: "Clear",
-                btn_print: "Print / Save PDF",
-                step_1: "1. Upload Images",
+                btn_print: "Print",
+                btn_pdf: "Download PDF",
+                step_1: "1. Add Cards",
+                tab_upload: "Upload",
+                tab_online: "Search online",
                 drag_drop: "Click or drag your cards here",
                 supported_formats: "Supports PNG, JPG, WEBP (Multiple)",
+                search_game: "Game",
+                search_placeholder: "Search by card name…",
+                search_hint: "Type at least 2 characters to search.",
+                search_loading: "Searching cards…",
+                search_no_results: "No cards found. Try another name.",
+                search_error: "Couldn't search right now. Check your connection and try again.",
+                search_retry: "Retry",
+                load_more: "Load more",
+                add_url: "Or paste an image URL",
+                add_url_placeholder: "https://…/card.jpg",
+                add_url_btn: "Add",
+                invalid_url: "Enter a valid http(s) image URL.",
+                image_load_error: "Couldn't load that image. The site may block external downloads.",
+                card_added: "Card added to the sheet.",
+                already_added: "That card is already on the sheet.",
+                no_cards_alert: "Add at least one card first.",
+                confirm_clear: "Remove all cards from the sheet?",
                 step_2: "2. Paper Format",
                 paper_size: "Paper Size",
                 orientation: "Orientation",
@@ -255,23 +371,51 @@
                 print_tips_title: "Printing Tips:",
                 tip_1: 'When printing, set "Scale: 100%" or "Actual Size".',
                 tip_2: "Ensure printer paper size matches the setting chosen here.",
+                tip_3: "Use Download PDF to get a real-size file for USB or sharing.",
                 no_cards_title: "No cards added yet.",
-                no_cards_desc: "Use the left panel to upload card images.",
+                no_cards_desc: "Upload card images or search for them online.",
                 sheet_capacity: "Sheet Capacity",
                 cards_unit: "cards",
                 duplicate: "Duplicate",
-                delete: "Delete"
+                delete: "Delete",
+                pdf_preparing: "Preparing PDF…",
+                pdf_downloading: "Downloading images",
+                pdf_building: "Building the PDF…",
+                pdf_done: "PDF downloaded successfully.",
+                pdf_partial: "PDF created, but some images couldn't be downloaded.",
+                pdf_error: "Couldn't generate the PDF. Please try again.",
+                pdf_library_error: "The PDF engine could not be loaded. Check the vendor folder."
             },
             es: {
-                subtitle: "Herramienta de distribución de cartas a escala real 1:1 para impresión",
+                subtitle: "Estudio de proxies de cartas imprimibles a escala 1:1",
                 capacity_sheet: "Capacidad / Hoja",
                 total_cards: "Total Cartas",
                 total_pages: "Hojas Totales",
                 btn_clear: "Limpiar",
-                btn_print: "Imprimir / Guardar PDF",
-                step_1: "1. Cargar Imágenes",
+                btn_print: "Imprimir",
+                btn_pdf: "Descargar PDF",
+                step_1: "1. Cargar Cartas",
+                tab_upload: "Subir",
+                tab_online: "Buscar online",
                 drag_drop: "Haz clic o arrastra tus cartas aquí",
                 supported_formats: "Admite PNG, JPG, WEBP (Múltiples)",
+                search_game: "Juego",
+                search_placeholder: "Busca por nombre de carta…",
+                search_hint: "Escribe al menos 2 caracteres para buscar.",
+                search_loading: "Buscando cartas…",
+                search_no_results: "No se encontraron cartas. Prueba con otro nombre.",
+                search_error: "No se pudo buscar ahora. Revisa tu conexión e inténtalo de nuevo.",
+                search_retry: "Reintentar",
+                load_more: "Cargar más",
+                add_url: "O pega una URL de imagen",
+                add_url_placeholder: "https://…/carta.jpg",
+                add_url_btn: "Añadir",
+                invalid_url: "Introduce una URL de imagen http(s) válida.",
+                image_load_error: "No se pudo cargar esa imagen. Puede que el sitio bloquee descargas externas.",
+                card_added: "Carta añadida a la hoja.",
+                already_added: "Esa carta ya está en la hoja.",
+                no_cards_alert: "Añade al menos una carta primero.",
+                confirm_clear: "¿Quitar todas las cartas de la hoja?",
                 step_2: "2. Formato de Papel",
                 paper_size: "Tamaño del Papel",
                 orientation: "Orientación",
@@ -289,23 +433,51 @@
                 print_tips_title: "Consejos de Impresión:",
                 tip_1: 'Al imprimir, selecciona "Escala: 100%" o "Tamaño Real".',
                 tip_2: "Verifica que el papel de tu impresora coincida con el elegido.",
+                tip_3: "Usa Descargar PDF para obtener un archivo a tamaño real listo para USB o para compartir.",
                 no_cards_title: "No has agregado ninguna carta aún.",
-                no_cards_desc: "Usa el panel lateral para subir imágenes de tus cartas.",
+                no_cards_desc: "Sube imágenes de cartas o búscalas online.",
                 sheet_capacity: "Capacidad de la hoja",
                 cards_unit: "cartas",
                 duplicate: "Duplicar",
-                delete: "Eliminar"
+                delete: "Eliminar",
+                pdf_preparing: "Preparando PDF…",
+                pdf_downloading: "Descargando imágenes",
+                pdf_building: "Creando el PDF…",
+                pdf_done: "PDF descargado correctamente.",
+                pdf_partial: "PDF creado, pero algunas imágenes no se pudieron descargar.",
+                pdf_error: "No se pudo generar el PDF. Inténtalo de nuevo.",
+                pdf_library_error: "No se pudo cargar el motor PDF. Revisa la carpeta vendor."
             },
             de: {
-                subtitle: "1:1 Druck-Layout-Werkzeug für Karten-Prototypen",
+                subtitle: "1:1 Druck-Studio für Karten-Proxy",
                 capacity_sheet: "Kapazität / Blatt",
                 total_cards: "Gesamte Karten",
                 total_pages: "Gesamte Seiten",
                 btn_clear: "Löschen",
-                btn_print: "Drucken / PDF Speichern",
-                step_1: "1. Bilder Hochladen",
+                btn_print: "Drucken",
+                btn_pdf: "PDF Herunterladen",
+                step_1: "1. Karten Hinzufügen",
+                tab_upload: "Hochladen",
+                tab_online: "Online suchen",
                 drag_drop: "Klicken oder ziehen Sie Ihre Karten hierher",
                 supported_formats: "Unterstützt PNG, JPG, WEBP (Mehrere)",
+                search_game: "Spiel",
+                search_placeholder: "Nach Kartenname suchen…",
+                search_hint: "Geben Sie mindestens 2 Zeichen ein.",
+                search_loading: "Karten werden gesucht…",
+                search_no_results: "Keine Karten gefunden. Versuchen Sie einen anderen Namen.",
+                search_error: "Die Suche ist gerade nicht möglich. Prüfen Sie Ihre Verbindung.",
+                search_retry: "Erneut versuchen",
+                load_more: "Mehr laden",
+                add_url: "Oder Bild-URL einfügen",
+                add_url_placeholder: "https://…/karte.jpg",
+                add_url_btn: "Hinzufügen",
+                invalid_url: "Geben Sie eine gültige http(s)-Bild-URL ein.",
+                image_load_error: "Das Bild konnte nicht geladen werden. Die Seite blockiert eventuell externe Downloads.",
+                card_added: "Karte zum Blatt hinzugefügt.",
+                already_added: "Diese Karte ist bereits auf dem Blatt.",
+                no_cards_alert: "Fügen Sie zuerst mindestens eine Karte hinzu.",
+                confirm_clear: "Alle Karten vom Blatt entfernen?",
                 step_2: "2. Papierformat",
                 paper_size: "Papiergröße",
                 orientation: "Ausrichtung",
@@ -323,18 +495,31 @@
                 print_tips_title: "Drucktipps:",
                 tip_1: 'Beim Drucken "Skalierung: 100%" oder "Tatsächliche Größe" wählen.',
                 tip_2: "Stellen Sie sicher, dass das Druckerpapier mit der Einstellung übereinstimmt.",
+                tip_3: "Mit PDF Herunterladen erhalten Sie eine datei in Originalgröße für USB oder zum Teilen.",
                 no_cards_title: "Noch keine Karten hinzugefügt.",
-                no_cards_desc: "Nutzen Sie das linke Menü zum Hochladen Ihrer Bilder.",
+                no_cards_desc: "Laden Sie Kartenbilder hoch oder suchen Sie online.",
                 sheet_capacity: "Blattkapazität",
                 cards_unit: "Karten",
                 duplicate: "Duplizieren",
-                delete: "Löschen"
+                delete: "Löschen",
+                pdf_preparing: "PDF wird vorbereitet…",
+                pdf_downloading: "Bilder werden geladen",
+                pdf_building: "PDF wird erstellt…",
+                pdf_done: "PDF erfolgreich heruntergeladen.",
+                pdf_partial: "PDF erstellt, aber einige Bilder konnten nicht geladen werden.",
+                pdf_error: "Das PDF konnte nicht erstellt werden. Versuchen Sie es erneut.",
+                pdf_library_error: "Die PDF-Engine konnte nicht geladen werden. Prüfen Sie den vendor-Ordner."
             }
         };
 
         let currentLang = 'en';
 
+        function t(key) {
+            return (i18n[currentLang] && i18n[currentLang][key]) || (i18n.en[key]) || key;
+        }
+
         function changeLanguage(lang) {
+            if (!i18n[lang]) return;
             currentLang = lang;
             document.querySelectorAll('[data-i18n]').forEach(el => {
                 const key = el.getAttribute('data-i18n');
@@ -342,7 +527,15 @@
                     el.textContent = i18n[lang][key];
                 }
             });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                if (i18n[lang] && i18n[lang][key]) {
+                    el.placeholder = i18n[lang][key];
+                }
+            });
+            document.documentElement.lang = lang;
             renderCards();
+            renderSearchState();
         }
 
         // Standard Sheet Dimensions (Width x Height in portrait, mm)
@@ -354,8 +547,10 @@
         };
 
         // Application State
-        let imagesList = [];
+        // Each card: { uid, src, thumb, name, game, set }
+        let cards = [];
         let currentOrientation = 'portrait';
+        let uidCounter = 0;
 
         // DOM Elements
         const dropZone = document.getElementById('drop-zone');
@@ -413,7 +608,29 @@
             renderCards();
         }
 
-        // Drag & Drop Handlers
+        // ── Tabs ────────────────────────────────────────────────────────────────
+        const tabUpload = document.getElementById('tab-btn-upload');
+        const tabOnline = document.getElementById('tab-btn-online');
+        const uploadPanel = document.getElementById('upload-panel');
+        const searchPanel = document.getElementById('search-panel');
+
+        const tabActiveClass = "px-2 py-1.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 bg-indigo-600/30 text-indigo-200 border border-indigo-500/60";
+        const tabIdleClass = "px-2 py-1.5 rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 text-slate-300 border border-transparent hover:bg-slate-700";
+
+        function setAddTab(tab) {
+            const online = tab === 'online';
+            tabUpload.className = online ? tabIdleClass : tabActiveClass;
+            tabOnline.className = online ? tabActiveClass : tabIdleClass;
+            uploadPanel.classList.toggle('hidden', online);
+            searchPanel.classList.toggle('hidden', !online);
+            if (online) {
+                setTimeout(() => document.getElementById('card-search').focus(), 30);
+            }
+        }
+        tabUpload.addEventListener('click', () => setAddTab('upload'));
+        tabOnline.addEventListener('click', () => setAddTab('online'));
+
+        // ── Local files ─────────────────────────────────────────────────────────
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -434,6 +651,7 @@
             if (e.target.files.length) {
                 handleFiles(e.target.files);
             }
+            e.target.value = '';
         });
 
         function handleFiles(files) {
@@ -441,7 +659,12 @@
                 if (file.type.startsWith('image/')) {
                     const reader = new FileReader();
                     reader.onload = (e) => {
-                        imagesList.push(e.target.result);
+                        cards.push(makeCard({
+                            src: e.target.result,
+                            thumb: e.target.result,
+                            name: file.name.replace(/\.[^.]+$/, ''),
+                            game: 'Local'
+                        }));
                         renderCards();
                     };
                     reader.readAsDataURL(file);
@@ -449,19 +672,588 @@
             });
         }
 
+        function makeCard(data) {
+            return {
+                uid: `card-${++uidCounter}`,
+                src: data.src,
+                thumb: data.thumb || data.src,
+                name: data.name || '',
+                game: data.game || '',
+                set: data.set || ''
+            };
+        }
+
         function removeCard(index) {
-            imagesList.splice(index, 1);
+            cards.splice(index, 1);
             renderCards();
         }
 
         function duplicateCard(index) {
-            imagesList.splice(index, 0, imagesList[index]);
+            const original = cards[index];
+            if (!original) return;
+            const copy = makeCard(original);
+            copy.name = original.name;
+            copy.game = original.game;
+            copy.set = original.set;
+            cards.splice(index, 0, copy);
             renderCards();
         }
 
         function clearAll() {
-            imagesList = [];
+            if (!cards.length) return;
+            if (!confirm(t('confirm_clear'))) return;
+            cards = [];
             renderCards();
+        }
+
+        // ── Online search ───────────────────────────────────────────────────────
+        function abortableDelay(ms, signal) {
+            return new Promise((resolve, reject) => {
+                if (signal?.aborted) {
+                    reject(new DOMException('Aborted', 'AbortError'));
+                    return;
+                }
+                const cleanup = () => {
+                    if (signal) signal.removeEventListener('abort', onAbort);
+                };
+                const onAbort = () => {
+                    clearTimeout(timer);
+                    cleanup();
+                    reject(new DOMException('Aborted', 'AbortError'));
+                };
+                const timer = setTimeout(() => {
+                    cleanup();
+                    resolve();
+                }, ms);
+                if (signal) signal.addEventListener('abort', onAbort, { once: true });
+            });
+        }
+
+        async function fetchWithRetry(url, options = {}, attempts = 3) {
+            let lastError = null;
+            for (let attempt = 0; attempt < attempts; attempt++) {
+                try {
+                    const response = await fetch(url, options);
+                    // Client errors (404, 400, etc.) are handled by the providers.
+                    if (response.ok || (response.status >= 400 && response.status < 500)) {
+                        return response;
+                    }
+                    lastError = new Error(`HTTP ${response.status}`);
+                } catch (error) {
+                    if (error.name === 'AbortError') throw error;
+                    lastError = error;
+                }
+                if (attempt < attempts - 1) {
+                    await abortableDelay(350 * (attempt + 1), options.signal);
+                }
+            }
+            throw lastError || new Error('Network request failed');
+        }
+
+        const GAME_PROVIDERS = {
+            mtg: {
+                label: 'Magic: The Gathering',
+                async search(query, page, signal) {
+                    const clean = query.replace(/[()"\[\]]/g, ' ').trim();
+                    const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent('name:' + clean)}&unique=prints&order=name&page=${page}`;
+                    const res = await fetchWithRetry(url, { signal });
+                    // Scryfall returns 404 when the search has no matches.
+                    if (res.status === 404) return { items: [], hasMore: false };
+                    if (!res.ok) throw new Error(`Scryfall: ${res.status}`);
+                    const json = await res.json();
+                    const items = (json.data || []).map(card => {
+                        const uris = card.image_uris || (card.card_faces || []).find(face => face.image_uris)?.image_uris;
+                        if (!uris) return null;
+                        return {
+                            id: card.id,
+                            name: card.name,
+                            set: `${card.set_name} · #${card.collector_number}`,
+                            image: uris.large || uris.normal,
+                            thumb: uris.normal || uris.small,
+                            game: 'Magic'
+                        };
+                    }).filter(Boolean);
+                    return { items, hasMore: !!json.has_more };
+                }
+            },
+            pokemon: {
+                label: 'Pokémon TCG',
+                async search(query, page, signal) {
+                    const clean = query.replace(/[\\*"?]/g, ' ').trim();
+                    const q = `name:*${clean}*`;
+                    const url = `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(q)}&page=${page}&pageSize=24&select=id,name,set,images`;
+                    const res = await fetchWithRetry(url, { signal });
+                    if (res.status === 404) return { items: [], hasMore: false };
+                    if (!res.ok) throw new Error(`Pokémon TCG: ${res.status}`);
+                    const json = await res.json();
+                    const items = (json.data || []).map(card => {
+                        const image = card.images?.large || card.images?.small;
+                        if (!image) return null;
+                        return {
+                            id: card.id,
+                            name: card.name,
+                            set: `${card.set?.name || 'Pokémon'}${card.set?.ptcgoCode ? ' · ' + card.set.ptcgoCode : ''}`,
+                            image,
+                            thumb: card.images?.small || image,
+                            game: 'Pokémon'
+                        };
+                    }).filter(Boolean);
+                    const total = Number(json.totalCount || 0);
+                    return { items, hasMore: page * 24 < total };
+                }
+            },
+            yugioh: {
+                label: 'Yu-Gi-Oh!',
+                async search(query, page, signal) {
+                    const offset = (page - 1) * 24;
+                    const url = `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=24&offset=${offset}`;
+                    const res = await fetchWithRetry(url, { signal });
+                    // YGOPRODeck returns 400 when there are no matching cards.
+                    if (res.status === 400 || res.status === 404) return { items: [], hasMore: false };
+                    if (!res.ok) throw new Error(`YGOPRODeck: ${res.status}`);
+                    const json = await res.json();
+                    const items = (json.data || []).map(card => {
+                        const image = card.card_images?.[0]?.image_url;
+                        if (!image) return null;
+                        const firstSet = card.card_sets?.[0]?.set_name;
+                        return {
+                            id: String(card.id),
+                            name: card.name,
+                            set: firstSet ? `${firstSet} · ${card.type || ''}`.trim() : (card.type || 'Yu-Gi-Oh!'),
+                            image,
+                            thumb: card.card_images?.[0]?.image_url_small || image,
+                            game: 'Yu-Gi-Oh!'
+                        };
+                    }).filter(Boolean);
+                    const rowsRemaining = json.meta?.rows_remaining;
+                    return { items, hasMore: rowsRemaining !== undefined ? rowsRemaining > 0 : items.length === 24 };
+                }
+            },
+            lorcana: {
+                label: 'Disney Lorcana',
+                async search(query, page, signal) {
+                    const search = `name~${query}`;
+                    const url = `https://api.lorcana-api.com/cards/fetch?search=${encodeURIComponent(search)}&pagesize=24&page=${page}`;
+                    const res = await fetchWithRetry(url, { signal });
+                    if (!res.ok) throw new Error(`Lorcana API: ${res.status}`);
+                    const json = await res.json();
+                    if (!Array.isArray(json)) return { items: [], hasMore: false };
+                    const items = json.map(card => {
+                        if (!card.Image) return null;
+                        return {
+                            id: `${card.Set_ID || ''}-${card.Set_Num || ''}-${card.Name}`,
+                            name: card.Name,
+                            set: `${card.Set_Name || 'Lorcana'}${card.Set_ID ? ' · ' + card.Set_ID : ''}`,
+                            // Lorcana originals are very large; use a resized source for the app and PDF.
+                            image: proxiedImageUrl(card.Image, 1000),
+                            thumb: proxiedImageUrl(card.Image, 320),
+                            game: 'Lorcana'
+                        };
+                    }).filter(Boolean);
+                    return { items, hasMore: json.length >= 24 };
+                }
+            }
+        };
+
+        const searchState = {
+            game: 'mtg',
+            query: '',
+            page: 1,
+            results: [],
+            hasMore: false,
+            loading: false,
+            error: null,
+            controller: null
+        };
+
+        const searchInput = document.getElementById('card-search');
+        const searchGameSelect = document.getElementById('search-game');
+        const searchResultsEl = document.getElementById('search-results');
+        const searchStatusEl = document.getElementById('search-status');
+        const searchMoreBtn = document.getElementById('search-more');
+        const searchClearBtn = document.getElementById('search-clear');
+        let searchTimer = null;
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function isCardAlreadyAdded(image) {
+            return cards.some(card => card.src === image || card.thumb === image);
+        }
+
+        function normalizeSearchText(value) {
+            return String(value || '')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function sortByRelevance(items, query) {
+            const q = normalizeSearchText(query);
+            return items
+                .map((item, index) => ({ item, index }))
+                .sort((a, b) => {
+                    const score = (name) => {
+                        const normalized = normalizeSearchText(name);
+                        if (normalized === q) return 0;
+                        if (normalized.startsWith(q)) return 1;
+                        if (normalized.includes(q)) return 2;
+                        return 3;
+                    };
+                    const difference = score(a.item.name) - score(b.item.name);
+                    return difference || a.index - b.index;
+                })
+                .map(entry => entry.item);
+        }
+
+        function renderSearchState() {
+            const status = searchStatusEl;
+            const query = searchState.query.trim();
+            const previousScrollTop = searchResultsEl.scrollTop;
+
+            searchResultsEl.innerHTML = '';
+
+            if (searchState.error) {
+                status.innerHTML = '';
+                const errorText = document.createElement('span');
+                errorText.className = 'text-rose-300';
+                errorText.textContent = t('search_error');
+                const retry = document.createElement('button');
+                retry.type = 'button';
+                retry.className = 'ml-1 underline hover:text-white font-semibold';
+                retry.textContent = t('search_retry');
+                retry.addEventListener('click', () => runSearch(true));
+                status.append(errorText, retry);
+                searchMoreBtn.classList.add('hidden');
+                return;
+            }
+
+            if (!query || query.length < 2) {
+                status.textContent = t('search_hint');
+                searchMoreBtn.classList.add('hidden');
+                return;
+            }
+
+            if (searchState.loading && searchState.results.length === 0) {
+                status.innerHTML = `<span class="inline-flex items-center gap-1.5 text-indigo-300"><i class="fa-solid fa-circle-notch fa-spin"></i>${escapeHtml(t('search_loading'))}</span>`;
+                searchMoreBtn.classList.add('hidden');
+                return;
+            }
+
+            if (!searchState.loading && searchState.results.length === 0) {
+                status.textContent = t('search_no_results');
+                searchMoreBtn.classList.add('hidden');
+                return;
+            }
+
+            status.textContent = `${searchState.results.length} ${currentLang === 'es' ? 'resultados' : currentLang === 'de' ? 'Ergebnisse' : 'results'}`;
+
+            const fragment = document.createDocumentFragment();
+            searchState.results.forEach(item => {
+                const added = isCardAlreadyAdded(item.image);
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = `group relative text-left rounded-lg overflow-hidden border transition ${added ? 'border-emerald-500/70 bg-emerald-950/20' : 'border-slate-700 bg-slate-900 hover:border-indigo-500 hover:bg-slate-800'}`;
+                button.title = `${item.name} — ${item.set}`;
+
+                const thumbWrap = document.createElement('div');
+                thumbWrap.className = 'aspect-[63/88] bg-slate-800 overflow-hidden';
+                const img = document.createElement('img');
+                img.src = item.thumb || item.image;
+                img.alt = item.name;
+                img.loading = 'lazy';
+                img.referrerPolicy = 'no-referrer';
+                img.className = 'w-full h-full object-cover group-hover:scale-[1.03] transition duration-200';
+                img.addEventListener('error', () => {
+                    img.remove();
+                    const fallback = document.createElement('div');
+                    fallback.className = 'w-full h-full flex items-center justify-center text-slate-600';
+                    fallback.innerHTML = '<i class="fa-solid fa-image text-lg"></i>';
+                    thumbWrap.appendChild(fallback);
+                });
+                thumbWrap.appendChild(img);
+
+                const info = document.createElement('div');
+                info.className = 'p-1.5';
+                const name = document.createElement('p');
+                name.className = 'text-[10px] font-semibold text-white leading-tight line-clamp-2';
+                name.textContent = item.name;
+                const set = document.createElement('p');
+                set.className = 'text-[9px] text-slate-400 truncate mt-0.5';
+                set.textContent = item.set;
+                info.append(name, set);
+
+                if (added) {
+                    const badge = document.createElement('span');
+                    badge.className = 'absolute top-1 right-1 w-5 h-5 rounded-full bg-emerald-500 text-slate-900 flex items-center justify-center shadow';
+                    badge.innerHTML = '<i class="fa-solid fa-check text-[10px]"></i>';
+                    button.appendChild(badge);
+                }
+
+                button.append(thumbWrap, info);
+                button.addEventListener('click', () => addOnlineCard(item));
+                fragment.appendChild(button);
+            });
+            searchResultsEl.appendChild(fragment);
+
+            if (searchState.loading) {
+                const loadingRow = document.createElement('div');
+                loadingRow.className = 'col-span-2 text-center text-[10px] text-indigo-300 py-1';
+                loadingRow.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-1"></i>' + escapeHtml(t('search_loading'));
+                searchResultsEl.appendChild(loadingRow);
+            }
+
+            searchMoreBtn.classList.toggle('hidden', !searchState.hasMore || searchState.loading);
+            searchResultsEl.scrollTop = previousScrollTop;
+        }
+
+        async function runSearch(reset) {
+            const query = searchState.query.trim();
+            if (query.length < 2) {
+                renderSearchState();
+                return;
+            }
+
+            if (searchState.controller) searchState.controller.abort();
+            const controller = new AbortController();
+            searchState.controller = controller;
+
+            if (reset) {
+                searchState.page = 1;
+                searchState.results = [];
+                searchState.hasMore = false;
+            }
+
+            searchState.loading = true;
+            searchState.error = null;
+            renderSearchState();
+
+            try {
+                const provider = GAME_PROVIDERS[searchState.game];
+                const pageToLoad = searchState.page;
+                const result = await provider.search(query, pageToLoad, controller.signal);
+                if (controller.signal.aborted) return;
+
+                const existing = new Set(searchState.results.map(item => item.id));
+                const fresh = result.items.filter(item => !existing.has(item.id));
+                const combined = reset ? result.items : searchState.results.concat(fresh);
+                searchState.results = sortByRelevance(combined, query);
+                searchState.hasMore = result.hasMore;
+                searchState.page = pageToLoad + 1;
+            } catch (error) {
+                if (error.name === 'AbortError') return;
+                console.error(error);
+                searchState.error = error;
+                searchState.hasMore = false;
+            } finally {
+                if (searchState.controller === controller) {
+                    searchState.loading = false;
+                    renderSearchState();
+                }
+            }
+        }
+
+        function addOnlineCard(item) {
+            if (isCardAlreadyAdded(item.image)) {
+                showToast(t('already_added'), 'info');
+                return;
+            }
+            cards.push(makeCard({
+                src: item.image,
+                thumb: item.thumb,
+                name: item.name,
+                game: item.game,
+                set: item.set
+            }));
+            renderCards();
+            renderSearchState();
+            showToast(t('card_added'), 'success');
+        }
+
+        searchGameSelect.addEventListener('change', (e) => {
+            searchState.game = e.target.value;
+            if (searchState.query.trim().length >= 2) {
+                runSearch(true);
+            } else {
+                renderSearchState();
+            }
+        });
+
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.trim();
+            searchState.query = query;
+            searchClearBtn.classList.toggle('hidden', !query);
+            clearTimeout(searchTimer);
+            if (query.length < 2) {
+                if (searchState.controller) searchState.controller.abort();
+                searchState.loading = false;
+                searchState.error = null;
+                searchState.results = [];
+                searchState.hasMore = false;
+                renderSearchState();
+                return;
+            }
+            searchTimer = setTimeout(() => runSearch(true), 450);
+        });
+
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(searchTimer);
+                runSearch(true);
+            }
+        });
+
+        searchClearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            searchState.query = '';
+            searchState.results = [];
+            searchState.hasMore = false;
+            searchState.error = null;
+            searchState.loading = false;
+            if (searchState.controller) searchState.controller.abort();
+            searchClearBtn.classList.add('hidden');
+            renderSearchState();
+            searchInput.focus();
+        });
+
+        searchMoreBtn.addEventListener('click', () => runSearch(false));
+
+        // ── Manual image URL fallback ───────────────────────────────────────────
+        const imageUrlInput = document.getElementById('image-url');
+        const addUrlBtn = document.getElementById('add-url-btn');
+
+        function proxiedImageUrl(url, width = 1000) {
+            return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=${width}&output=jpg&q=92`;
+        }
+
+        function testImageUrl(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const timer = setTimeout(() => {
+                    img.src = '';
+                    reject(new Error('Image load timed out'));
+                }, 15000);
+                img.onload = () => {
+                    clearTimeout(timer);
+                    resolve(src);
+                };
+                img.onerror = () => {
+                    clearTimeout(timer);
+                    reject(new Error('Image failed to load'));
+                };
+                img.src = src;
+            });
+        }
+
+        async function resolveImageUrl(url) {
+            try {
+                return await testImageUrl(url);
+            } catch (_) {
+                const proxied = proxiedImageUrl(url, 1000);
+                await testImageUrl(proxied);
+                return proxied;
+            }
+        }
+
+        async function addImageFromUrl() {
+            const raw = imageUrlInput.value.trim();
+            let parsed;
+            try {
+                parsed = new URL(raw);
+            } catch (_) {
+                showToast(t('invalid_url'), 'error');
+                return;
+            }
+            if (!/^https?:$/.test(parsed.protocol)) {
+                showToast(t('invalid_url'), 'error');
+                return;
+            }
+
+            addUrlBtn.disabled = true;
+            addUrlBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+            try {
+                const resolved = await resolveImageUrl(parsed.href);
+                const fileName = decodeURIComponent(parsed.pathname.split('/').pop() || 'Card');
+                const name = fileName.replace(/\.[^.]+$/, '') || 'Card';
+                cards.push(makeCard({ src: resolved, thumb: resolved, name, game: 'URL' }));
+                imageUrlInput.value = '';
+                renderCards();
+                showToast(t('card_added'), 'success');
+            } catch (error) {
+                console.error(error);
+                showToast(t('image_load_error'), 'error');
+            } finally {
+                addUrlBtn.disabled = false;
+                addUrlBtn.textContent = t('add_url_btn');
+            }
+        }
+
+        addUrlBtn.addEventListener('click', addImageFromUrl);
+        imageUrlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addImageFromUrl();
+            }
+        });
+
+        // ── Toast notifications ─────────────────────────────────────────────────
+        const toastContainer = document.getElementById('toast-container');
+
+        function showToast(message, type = 'info', duration = 3500) {
+            const colors = {
+                success: 'bg-emerald-600 text-white',
+                error: 'bg-rose-600 text-white',
+                info: 'bg-slate-700 text-white',
+                warning: 'bg-amber-500 text-slate-950'
+            };
+            const icons = {
+                success: 'fa-circle-check',
+                error: 'fa-circle-exclamation',
+                info: 'fa-circle-info',
+                warning: 'fa-triangle-exclamation'
+            };
+            const toast = document.createElement('div');
+            toast.className = `pointer-events-auto max-w-xs px-3 py-2 rounded-lg shadow-xl text-xs font-medium flex items-start gap-2 inkra-fade-up ${colors[type] || colors.info}`;
+            const icon = document.createElement('i');
+            icon.className = `fa-solid ${icons[type] || icons.info} mt-0.5`;
+            const text = document.createElement('span');
+            text.textContent = message;
+            toast.append(icon, text);
+            toastContainer.appendChild(toast);
+            setTimeout(() => {
+                toast.style.transition = 'opacity .2s, transform .2s';
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(6px)';
+                setTimeout(() => toast.remove(), 220);
+            }, duration);
+        }
+
+        // ── Layout ──────────────────────────────────────────────────────────────
+        function getLayoutSettings() {
+            const paperType = paperFormatSelect.value;
+            const paperDim = PAPER_SIZES[paperType] || PAPER_SIZES['A4'];
+            const sheetW = currentOrientation === 'portrait' ? paperDim.width : paperDim.height;
+            const sheetH = currentOrientation === 'portrait' ? paperDim.height : paperDim.width;
+            const width = Math.max(1, parseFloat(cardWidthInput.value) || 59);
+            const height = Math.max(1, parseFloat(cardHeightInput.value) || 86);
+            const gap = parseFloat(cardGapInput.value) || 0;
+            const marginV = parseFloat(marginVInput.value) || 0;
+            const showCrop = toggleCrop.checked;
+            const printableWidth = sheetW - 10;
+            const printableHeight = sheetH - (marginV * 2);
+            const cols = Math.max(1, Math.floor((printableWidth + gap) / (width + gap)));
+            const rows = Math.max(1, Math.floor((printableHeight + gap) / (height + gap)));
+            const cardsPerPage = cols * rows;
+            return { paperType, sheetW, sheetH, width, height, gap, marginV, showCrop, cols, rows, cardsPerPage };
         }
 
         // Dynamic Print Styles Injection
@@ -486,89 +1278,97 @@
             `;
         }
 
+        function buildCardElement(card, globalIdx, settings) {
+            const cardWrapper = document.createElement('div');
+            cardWrapper.className = `relative group ${settings.showCrop ? 'crop-marks' : ''}`;
+            cardWrapper.style.width = `${settings.width}mm`;
+            cardWrapper.style.height = `${settings.height}mm`;
+            cardWrapper.title = [card.name, card.set, card.game].filter(Boolean).join(' · ');
+
+            const img = document.createElement('img');
+            img.src = card.src;
+            img.alt = card.name || 'Card';
+            img.referrerPolicy = 'no-referrer';
+            img.className = 'w-full h-full object-cover';
+            img.style.display = 'block';
+            img.addEventListener('error', () => {
+                img.style.display = 'none';
+                if (!cardWrapper.querySelector('.card-image-error')) {
+                    const errorBox = document.createElement('div');
+                    errorBox.className = 'card-image-error w-full h-full flex flex-col items-center justify-center bg-slate-800 text-slate-400 text-center p-1';
+                    errorBox.innerHTML = '<i class="fa-solid fa-image-slash text-lg mb-1"></i><span class="text-[7px] leading-tight">Image unavailable</span>';
+                    cardWrapper.insertBefore(errorBox, cardWrapper.firstChild);
+                }
+            });
+
+            const overlay = document.createElement('div');
+            overlay.className = 'no-print absolute inset-0 bg-black/60 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition flex flex-col items-center justify-center gap-2 p-1';
+            overlay.innerHTML = `
+                <div class="flex items-center justify-center gap-2">
+                    <button type="button" data-action="duplicate" title="${escapeHtml(t('duplicate'))}" class="p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow">
+                        <i class="fa-solid fa-copy text-xs"></i>
+                    </button>
+                    <button type="button" data-action="delete" title="${escapeHtml(t('delete'))}" class="p-2 bg-red-600 hover:bg-red-500 text-white rounded-full shadow">
+                        <i class="fa-solid fa-trash text-xs"></i>
+                    </button>
+                </div>
+                ${card.name ? `<p class="text-[8px] text-white/90 text-center leading-tight line-clamp-2 px-0.5">${escapeHtml(card.name)}</p>` : ''}
+            `;
+            overlay.querySelector('[data-action="duplicate"]').addEventListener('click', () => duplicateCard(globalIdx));
+            overlay.querySelector('[data-action="delete"]').addEventListener('click', () => removeCard(globalIdx));
+
+            cardWrapper.append(img, overlay);
+            return cardWrapper;
+        }
+
         function renderCards() {
             const lang = i18n[currentLang];
-            const paperType = paperFormatSelect.value;
-            const paperDim = PAPER_SIZES[paperType] || PAPER_SIZES['A4'];
-            
-            const sheetW = currentOrientation === 'portrait' ? paperDim.width : paperDim.height;
-            const sheetH = currentOrientation === 'portrait' ? paperDim.height : paperDim.width;
+            const s = getLayoutSettings();
 
-            const width = parseFloat(cardWidthInput.value) || 59;
-            const height = parseFloat(cardHeightInput.value) || 86;
-            const gap = parseFloat(cardGapInput.value) || 0;
-            const marginV = parseFloat(marginVInput.value) || 10;
-            const showCrop = toggleCrop.checked;
-
-            updatePrintStyles(sheetW, sheetH);
+            updatePrintStyles(s.sheetW, s.sheetH);
 
             const pagesContainer = document.getElementById('pages-container');
             pagesContainer.innerHTML = '';
 
-            const printableWidth = sheetW - 10;
-            const printableHeight = sheetH - (marginV * 2);
-
-            const cols = Math.max(1, Math.floor((printableWidth + gap) / (width + gap)));
-            const rows = Math.max(1, Math.floor((printableHeight + gap) / (height + gap)));
-            const cardsPerPage = cols * rows;
-
-            document.getElementById('capacity-per-sheet').innerText = `${cardsPerPage} ${lang.cards_unit} (${cols}x${rows})`;
-            document.getElementById('total-cards-count').innerText = imagesList.length;
-            const totalPages = Math.ceil(imagesList.length / cardsPerPage) || 0;
+            document.getElementById('capacity-per-sheet').innerText = `${s.cardsPerPage} ${lang.cards_unit} (${s.cols}x${s.rows})`;
+            document.getElementById('total-cards-count').innerText = cards.length;
+            const totalPages = Math.ceil(cards.length / s.cardsPerPage) || 0;
             document.getElementById('total-pages-count').innerText = totalPages;
 
-            if (imagesList.length === 0) {
+            if (cards.length === 0) {
                 const emptyDiv = document.createElement('div');
                 emptyDiv.className = 'sheet-preview print-page p-4 flex flex-col items-center justify-center text-slate-400';
-                emptyDiv.style.width = `${sheetW}mm`;
-                emptyDiv.style.height = `${sheetH}mm`;
+                emptyDiv.style.width = `${s.sheetW}mm`;
+                emptyDiv.style.height = `${s.sheetH}mm`;
                 emptyDiv.innerHTML = `
                     <i class="fa-solid fa-images text-5xl mb-3 text-slate-300"></i>
-                    <p class="font-medium text-sm">${lang.no_cards_title}</p>
-                    <p class="text-xs text-slate-400 mt-1">${lang.no_cards_desc}</p>
+                    <p class="font-medium text-sm">${escapeHtml(lang.no_cards_title)}</p>
+                    <p class="text-xs text-slate-400 mt-1 text-center">${escapeHtml(lang.no_cards_desc)}</p>
                     <span class="mt-4 px-3 py-1 bg-slate-100 border text-slate-600 rounded text-xs font-semibold">
-                        ${lang.sheet_capacity} (${paperType}): ${cardsPerPage} ${lang.cards_unit}
+                        ${escapeHtml(lang.sheet_capacity)} (${s.paperType}): ${s.cardsPerPage} ${escapeHtml(lang.cards_unit)}
                     </span>
                 `;
                 pagesContainer.appendChild(emptyDiv);
                 return;
             }
 
-            for (let i = 0; i < imagesList.length; i += cardsPerPage) {
-                const pageImages = imagesList.slice(i, i + cardsPerPage);
-                
+            for (let i = 0; i < cards.length; i += s.cardsPerPage) {
+                const pageCards = cards.slice(i, i + s.cardsPerPage);
+
                 const pageDiv = document.createElement('div');
                 pageDiv.className = 'sheet-preview print-page flex flex-col items-center justify-start';
-                pageDiv.style.width = `${sheetW}mm`;
-                pageDiv.style.height = `${sheetH}mm`;
-                pageDiv.style.paddingTop = `${marginV}mm`;
-                pageDiv.style.paddingBottom = `${marginV}mm`;
+                pageDiv.style.width = `${s.sheetW}mm`;
+                pageDiv.style.height = `${s.sheetH}mm`;
+                pageDiv.style.paddingTop = `${s.marginV}mm`;
+                pageDiv.style.paddingBottom = `${s.marginV}mm`;
 
                 const grid = document.createElement('div');
                 grid.className = 'flex flex-wrap justify-center content-start';
-                grid.style.gap = `${gap}mm`;
+                grid.style.gap = `${s.gap}mm`;
                 grid.style.width = '100%';
 
-                pageImages.forEach((imgSrc, idx) => {
-                    const globalIdx = i + idx;
-                    const cardWrapper = document.createElement('div');
-                    cardWrapper.className = `relative group ${showCrop ? 'crop-marks' : ''}`;
-                    cardWrapper.style.width = `${width}mm`;
-                    cardWrapper.style.height = `${height}mm`;
-
-                    cardWrapper.innerHTML = `
-                        <img src="${imgSrc}" class="w-full h-full object-cover" style="display:block;">
-                        <div class="no-print absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
-                            <button onclick="duplicateCard(${globalIdx})" title="${lang.duplicate}" class="p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow">
-                                <i class="fa-solid fa-copy text-xs"></i>
-                            </button>
-                            <button onclick="removeCard(${globalIdx})" title="${lang.delete}" class="p-2 bg-red-600 hover:bg-red-500 text-white rounded-full shadow">
-                                <i class="fa-solid fa-trash text-xs"></i>
-                            </button>
-                        </div>
-                    `;
-
-                    grid.appendChild(cardWrapper);
+                pageCards.forEach((card, idx) => {
+                    grid.appendChild(buildCardElement(card, i + idx, s));
                 });
 
                 pageDiv.appendChild(grid);
@@ -576,8 +1376,245 @@
             }
         }
 
-        // Initial render
+        // ── PDF export ──────────────────────────────────────────────────────────
+        const pdfDataCache = new Map();
+        const pdfOverlay = document.getElementById('pdf-overlay');
+        const pdfStatusEl = document.getElementById('pdf-status');
+        const pdfDetailEl = document.getElementById('pdf-detail');
+        const pdfProgressBar = document.getElementById('pdf-progress-bar');
+
+        function setPdfProgress(percent, status, detail = '') {
+            pdfProgressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+            if (status) pdfStatusEl.textContent = status;
+            pdfDetailEl.textContent = detail || '\u00A0';
+        }
+
+        function showPdfOverlay(show) {
+            pdfOverlay.classList.toggle('hidden', !show);
+            pdfOverlay.classList.toggle('flex', show);
+            const btn = document.getElementById('btn-download-pdf');
+            if (btn) btn.disabled = show;
+        }
+
+        async function fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                return await fetch(url, { ...options, signal: controller.signal });
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        async function fetchImageBlob(src) {
+            if (src.startsWith('data:')) {
+                const res = await fetch(src);
+                if (!res.ok) throw new Error('Data URL failed');
+                return res.blob();
+            }
+
+            try {
+                const direct = await fetchWithTimeout(src, { mode: 'cors', cache: 'force-cache', referrerPolicy: 'no-referrer' });
+                if (direct.ok) return await direct.blob();
+            } catch (_) {
+                // Fall through to the image proxy below.
+            }
+
+            const proxied = proxiedImageUrl(src, 1200);
+            const res = await fetchWithTimeout(proxied, { cache: 'force-cache' });
+            if (!res.ok) throw new Error(`Image proxy failed: ${res.status}`);
+            return res.blob();
+        }
+
+        function loadBitmap(blob) {
+            return new Promise((resolve, reject) => {
+                if (typeof createImageBitmap === 'function') {
+                    createImageBitmap(blob).then(resolve).catch(() => {
+                        loadBitmapWithImage(blob).then(resolve).catch(reject);
+                    });
+                    return;
+                }
+                loadBitmapWithImage(blob).then(resolve).catch(reject);
+            });
+        }
+
+        function loadBitmapWithImage(blob) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(blob);
+                const img = new Image();
+                img.onload = () => resolve({ image: img, revoke: () => URL.revokeObjectURL(url) });
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error('Could not decode image'));
+                };
+                img.src = url;
+            });
+        }
+
+        async function imageToJpeg(src, targetAspect) {
+            const cacheKey = `${src}|${Number(targetAspect || 0).toFixed(5)}`;
+            if (pdfDataCache.has(cacheKey)) return pdfDataCache.get(cacheKey);
+
+            const blob = await fetchImageBlob(src);
+            const loaded = await loadBitmap(blob);
+            const source = loaded.image || loaded;
+
+            const srcWidth = source.width || source.naturalWidth || 0;
+            const srcHeight = source.height || source.naturalHeight || 0;
+            if (!srcWidth || !srcHeight) {
+                if (loaded.revoke) loaded.revoke();
+                if (source.close) source.close();
+                throw new Error('Image has no dimensions');
+            }
+
+            // Crop exactly like the preview's object-cover, so the PDF does not distort images.
+            let cropX = 0;
+            let cropY = 0;
+            let cropW = srcWidth;
+            let cropH = srcHeight;
+            if (targetAspect && targetAspect > 0) {
+                const sourceAspect = srcWidth / srcHeight;
+                if (sourceAspect > targetAspect) {
+                    cropW = srcHeight * targetAspect;
+                    cropX = (srcWidth - cropW) / 2;
+                } else if (sourceAspect < targetAspect) {
+                    cropH = srcWidth / targetAspect;
+                    cropY = (srcHeight - cropH) / 2;
+                }
+            }
+
+            const maxWidth = 1000;
+            const scale = Math.min(1, maxWidth / cropW);
+            const width = Math.max(1, Math.round(cropW * scale));
+            const height = Math.max(1, Math.round(cropH * scale));
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(source, cropX, cropY, cropW, cropH, 0, 0, width, height);
+
+            if (loaded.revoke) loaded.revoke();
+            if (source.close) source.close();
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+            pdfDataCache.set(cacheKey, dataUrl);
+            return dataUrl;
+        }
+
+        async function downloadPDF() {
+            if (!cards.length) {
+                showToast(t('no_cards_alert'), 'info');
+                return;
+            }
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                showToast(t('pdf_library_error'), 'error');
+                return;
+            }
+
+            const s = getLayoutSettings();
+            const { jsPDF } = window.jspdf;
+            const totalUnique = new Set(cards.map(card => card.src)).size;
+
+            showPdfOverlay(true);
+            setPdfProgress(2, t('pdf_preparing'));
+            await new Promise(resolve => setTimeout(resolve, 30));
+
+            const dataMap = new Map();
+            const sources = [...new Set(cards.map(card => card.src))];
+            let completed = 0;
+            let failed = 0;
+
+            async function worker() {
+                while (sources.length) {
+                    const src = sources.shift();
+                    try {
+                        dataMap.set(src, await imageToJpeg(src, s.width / s.height));
+                    } catch (error) {
+                        console.error('PDF image failed:', src, error);
+                        failed++;
+                    }
+                    completed++;
+                    const percent = totalUnique ? (completed / totalUnique) * 80 : 80;
+                    setPdfProgress(percent, t('pdf_downloading'), `${completed}/${totalUnique}`);
+                }
+            }
+
+            const workerCount = Math.max(1, Math.min(4, sources.length));
+            await Promise.all(Array.from({ length: workerCount }, worker));
+
+            setPdfProgress(84, t('pdf_building'));
+            await new Promise(resolve => setTimeout(resolve, 30));
+
+            const orientation = s.sheetW > s.sheetH ? 'landscape' : 'portrait';
+
+            try {
+                const doc = new jsPDF({ orientation, unit: 'mm', format: [s.sheetW, s.sheetH], compress: true });
+                doc.setProperties({
+                    title: `Inkra - ${s.paperType}`,
+                    subject: 'Printable card proxies',
+                    creator: 'Inkra',
+                    author: 'Inkra'
+                });
+
+                for (let start = 0; start < cards.length; start += s.cardsPerPage) {
+                    if (start > 0) doc.addPage([s.sheetW, s.sheetH], orientation);
+                    const pageCards = cards.slice(start, start + s.cardsPerPage);
+
+                    pageCards.forEach((card, idx) => {
+                        const col = idx % s.cols;
+                        const row = Math.floor(idx / s.cols);
+                        const rowCount = Math.min(s.cols, pageCards.length - row * s.cols);
+                        const rowWidth = (rowCount * s.width) + ((rowCount - 1) * s.gap);
+                        const rowStartX = (s.sheetW - rowWidth) / 2;
+                        const x = rowStartX + (col * (s.width + s.gap));
+                        const y = s.marginV + (row * (s.height + s.gap));
+
+                        const dataUrl = dataMap.get(card.src);
+                        if (dataUrl) {
+                            doc.addImage(dataUrl, 'JPEG', x, y, s.width, s.height, undefined, 'FAST');
+                        } else {
+                            doc.setFillColor(235, 235, 235);
+                            doc.rect(x, y, s.width, s.height, 'F');
+                            doc.setTextColor(120, 120, 120);
+                            doc.setFontSize(6);
+                            doc.text('Image unavailable', x + 2, y + (s.height / 2));
+                        }
+
+                        if (s.showCrop) {
+                            doc.setDrawColor(165, 165, 165);
+                            doc.setLineWidth(0.12);
+                            if (typeof doc.setLineDashPattern === 'function') {
+                                doc.setLineDashPattern([1, 1], 0);
+                            }
+                            doc.rect(x, y, s.width, s.height);
+                            if (typeof doc.setLineDashPattern === 'function') {
+                                doc.setLineDashPattern([], 0);
+                            }
+                        }
+                    });
+                }
+
+                setPdfProgress(100, t('pdf_done'));
+                const safePaper = String(s.paperType).toLowerCase();
+                const date = new Date().toISOString().slice(0, 10);
+                doc.save(`Inkra-${safePaper}-${date}.pdf`);
+
+                setTimeout(() => showPdfOverlay(false), 350);
+                if (failed > 0) showToast(t('pdf_partial'), 'warning', 5000);
+                else showToast(t('pdf_done'), 'success');
+            } catch (error) {
+                console.error(error);
+                showPdfOverlay(false);
+                showToast(t('pdf_error'), 'error');
+            }
+        }
+
+        // ── Initial render ─────────────────────────────────────────────────────
         renderCards();
+        renderSearchState();
     </script>
 </body>
 </html>
