@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 140" width="460" height="140">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090d16"/>
+      <stop offset="50%" stop-color="#13162d"/>
+      <stop offset="100%" stop-color="#090d16"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#34d399"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer cosmic frame -->
+  <rect x="2" y="2" width="456" height="136" rx="22" fill="url(#bgGrad)" stroke="url(#accentGrad)" stroke-opacity="0.4" stroke-width="1.5"/>
+
+  <!-- Subtle grid background -->
+  <g stroke="#334155" stroke-opacity="0.25" stroke-width="1">
+    <line x1="0" y1="35" x2="460" y2="35"/>
+    <line x1="0" y1="70" x2="460" y2="70"/>
+    <line x1="0" y1="105" x2="460" y2="105"/>
+    <line x1="115" y1="0" x2="115" y2="140"/>
+    <line x1="230" y1="0" x2="230" y2="140"/>
+    <line x1="345" y1="0" x2="345" y2="140"/>
+  </g>
+
+  <!-- Emblem group -->
+  <g transform="translate(30, 20)">
+    <!-- Crop marks -->
+    <g stroke="#38bdf8" stroke-width="2" stroke-linecap="round" opacity="0.85">
+      <path d="M6 16 V6 H16"/>
+      <path d="M84 6 H94 V16"/>
+      <path d="M6 84 V94 H16"/>
+      <path d="M84 94 H94 V84"/>
+    </g>
+
+    <!-- Back card -->
+    <rect x="20" y="16" width="38" height="54" rx="5" fill="#1e293b" stroke="#6366f1" stroke-width="2" transform="rotate(-8 39 43)"/>
+
+    <!-- Front card with subtle float -->
+    <g>
+      <animateTransform attributeName="transform" type="translate" values="0,0; 0,-3; 0,0" dur="4s" repeatCount="indefinite"/>
+      <rect x="34" y="22" width="40" height="56" rx="5" fill="url(#cardGrad)" stroke="#e0e7ff" stroke-width="2"/>
+      <rect x="41" y="29" width="26" height="19" rx="2.5" fill="#0f172a" fill-opacity="0.45" stroke="#bae6fd" stroke-opacity="0.55" stroke-width="1"/>
+      <line x1="41" y1="56" x2="67" y2="56" stroke="#e0e7ff" stroke-opacity="0.8" stroke-width="2" stroke-linecap="round"/>
+      <line x1="41" y1="63" x2="58" y2="63" stroke="#a5b4fc" stroke-opacity="0.75" stroke-width="2" stroke-linecap="round"/>
+    </g>
+
+    <!-- Pulsing registration dot -->
+    <circle cx="82" cy="20" r="3" fill="#34d399">
+      <animate attributeName="opacity" values="1;0.35;1" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Typography -->
+  <text x="148" y="64" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="38" font-weight="800" letter-spacing="-0.5" fill="#ffffff">
+    Inkra
+  </text>
+  <text x="150" y="90" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="600" letter-spacing="1.8" fill="url(#accentGrad)">
+    PRINTABLE CARD PROXY STUDIO
+  </text>
+  <text x="150" y="112" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" fill="#94a3b8">
+    by theAstroBruh · 1:1 Scale · Browser-Native
+  </text>
+</svg>

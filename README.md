@@ -1,109 +1,113 @@
-# Inkra
+<div align="center">
 
-> A free, browser-based studio to arrange trading card proxies into print-ready, real-scale (1:1) grid layouts — no installation required.
+<!-- Animated SVG logo — card proxy grid & registration marks -->
+<a href="https://theastrobruh.github.io/Inkra/">
+  <img src="assets/readme/inkra-logo.svg" alt="Inkra — Printable Card Proxy Studio" width="460"/>
+</a>
 
-<p align="center">
-  <a href="https://theastrobruh.github.io/Inkra/">
-    <img src="https://img.shields.io/badge/%E2%96%B6%20Open%20Inkra-Try%20it%20now-4f46e5?style=for-the-badge&logoColor=white" alt="Open Inkra — try it now" height="44">
-  </a>
-</p>
+<br/>
 
-**Live app: [theastrobruh.github.io/Inkra](https://theastrobruh.github.io/Inkra/)**
+> **Estudio gratuito en el navegador para organizar proxies de cartas coleccionables en cuadrículas listas para imprimir a escala real (1:1) y exportar en PDF. Cero instalaciones, 100% local en tu navegador.**
 
-![GitHub Actions](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)
-![GitHub Pages](https://img.shields.io/badge/Hosted%20on-GitHub%20Pages-222?logo=github&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)](https://github.com/theastrobruh/Inkra/actions)
+[![GitHub Pages](https://img.shields.io/badge/Live%20on-GitHub%20Pages-222?logo=github&logoColor=white)](https://theastrobruh.github.io/Inkra/)
+[![HTML5](https://img.shields.io/badge/HTML5-Self--Contained-E34F26?logo=html5&logoColor=white)](inkra.html)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![jsPDF](https://img.shields.io/badge/PDF-jsPDF-4f46e5)](vendor/jspdf.umd.min.js)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Ko-fi](https://img.shields.io/badge/Support-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/theastrobruh)
 
----
+<br/>
 
-## Features
+[**🖨️ Open Inkra**](https://theastrobruh.github.io/Inkra/) · [**🚀 the.astro.os**](https://theastrobruh.github.io/the.astro.os/) · [**🎨 Astro.Studio**](https://theastrobruh.github.io/Astro.Studio/) · [**🎴 CardGram**](https://theastrobruh.github.io/CardGram/) · [**☕ Support the Project**](https://ko-fi.com/theastrobruh)
 
-- **Search cards online** — Magic: The Gathering, Pokémon TCG, Yu-Gi-Oh! and Disney Lorcana.
-- **Upload local images** — PNG, JPG and WEBP, including multiple files at once.
-- **Paste an image URL** — useful when a card is not listed in the supported databases.
-- **True 1:1 scale output** — cards print at exact physical dimensions.
-- **Download a real-size PDF** — each page matches the selected paper size, ready for USB, sharing or printing. The PDF embeds the images, so it does not depend on the original websites.
-- **Game presets** — Cardfight!! Vanguard, Yu-Gi-Oh!, Pokémon / Magic / Lorcana, Tarot, Mini Euro and custom sizes.
-- **Multiple paper formats** — A4, Letter, Legal, A3 — Portrait & Landscape.
-- **Crop marks** — optional cutting guides for every card.
-- **i18n** — English, Español, Deutsch.
-- **Print / Save PDF from the browser** — a separate browser-print flow is still available.
-- **Duplicate & Delete** per-card controls in the preview.
-- **Runs in the browser** — card search requests go directly from your browser to the public card APIs; nothing is uploaded to an Inkra server.
+</div>
 
 ---
 
-## Usage
+## ✨ Un Ecosistema: theAstroBruh Universe
 
-### Online
+**Inkra** forma parte del ecosistema creativo desarrollado por **[theAstroBruh](https://github.com/theastrobruh)**, compartiendo la misma filosofía de ingeniería web: herramientas creativas rápidas, privadas y ejecutadas directamente en el navegador sin dependencias pesadas ni servidores externos.
 
-**[Open Inkra →](https://theastrobruh.github.io/Inkra/)** then:
-
-1. Choose **Search online** or **Upload**.
-2. Add the cards you want to the sheet.
-3. Configure paper, orientation, card size, spacing and crop marks.
-4. Click **Download PDF** for a real-size file, or **Print** for the browser print dialog.
-
-### Local
-
-Open `inkra.html` in any modern browser. The PDF engine is included in `vendor/`, so PDF export works without a build step.
-
-> Card search requires an internet connection because it uses public card databases.
+```
+                               ┌───────────────────────────┐
+                               │   theAstroBruh Universe   │
+                               └─────────────┬─────────────┘
+                                             │
+     ┌───────────────────────┬───────────────┴───────────────┬───────────────────────┐
+     ▼                       ▼                               ▼                       ▼
+the.astro.os           Astro.Studio                      CardGram                  Inkra
+Web Desktop OS     Photo & Color Studio               3D Card Showcase       Card Proxy Studio
+```
 
 ---
 
-## Printing tips
+## 🛠️ Características principales
 
-| Setting | Recommended value |
+| | Módulo | Detalles |
+|---|---|---|
+| 🔍 | **Búsqueda Online de Cartas** | Busca cartas directamente en **Magic: The Gathering**, **Pokémon TCG**, **Yu-Gi-Oh!** y **Disney Lorcana** sin salir de la app. |
+| 🖼️ | **Carga Local y URLs** | Sube múltiples imágenes (**PNG, JPG, WEBP**) o pega una URL directa cuando la carta no esté en las bases de datos. |
+| 📐 | **Escala Real 1:1** | Presets exactos para **Cardfight!! Vanguard**, **Yu-Gi-Oh!**, **Pokémon / Magic / Lorcana**, **Tarot**, **Mini Euro** y medidas personalizadas. |
+| 📄 | **Exportación PDF Real** | Genera un PDF a tamaño real con las imágenes incrustadas (sin depender de sitios externos), listo para USB, compartir o imprimir. |
+| ✂️ | **Guías de Corte y Formatos** | Marcas de corte opcionales para cada carta y soporte para **A4, Letter, Legal y A3** en vertical u horizontal. |
+| 🌐 | **Multilenguaje & Privado** | Interfaz en **English, Español y Deutsch**, con controles de duplicar/eliminar por carta y ejecución 100% en tu navegador. |
+
+---
+
+## 🖨️ Consejos de impresión
+
+| Ajuste | Valor recomendado |
 |---|---|
-| Scale | **100% / Actual Size** |
-| Margins | **None** |
-| Background graphics | **Enabled** |
-| Paper size | Match the selector in the tool |
+| Escala | **100% / Tamaño real** |
+| Márgenes | **Ninguno (None)** |
+| Gráficos de fondo | **Activados** |
+| Tamaño de papel | Igual al seleccionado en Inkra |
 
-For the most predictable result when sharing or moving files on a USB drive, use **Download PDF**: the PDF is generated at the exact paper and card dimensions and contains the card images.
+> Para obtener el resultado más predecible al imprimir desde otra PC o llevar el archivo en USB, usa **Download PDF**: el PDF se genera con las dimensiones físicas exactas e incrusta todas las imágenes.
 
 ---
 
-## Card data sources
+## 🃏 Fuentes de datos de cartas
 
-| Game | Source |
+| Juego | API |
 |---|---|
 | Magic: The Gathering | [Scryfall API](https://scryfall.com/docs/api) |
 | Pokémon TCG | [Pokémon TCG API](https://docs.pokemontcg.io/) |
 | Yu-Gi-Oh! | [YGOPRODeck API](https://ygoprodeck.com/api-guide/) |
 | Disney Lorcana | [Lorcana API](https://lorcana-api.com/) |
 
-Card search availability and rate limits are controlled by each service. Vanguard cards can still be uploaded manually or added through an image URL.
-
-Card names, images and game data belong to their respective owners. Inkra only provides a layout tool for personal proxy printing.
+Los nombres, imágenes y datos de cada juego pertenecen a sus respectivos propietarios. Inkra es únicamente una herramienta de maquetación para impresión personal de proxies.
 
 ---
 
-## Project structure
+## 💻 Uso local y desarrollo
+
+No hay paso de compilación (*build step*). Abre `inkra.html` en cualquier navegador moderno (el motor PDF está incluido en `vendor/jspdf.umd.min.js`).
 
 ```
-├── inkra.html              # The entire app (HTML + CSS + JS, self-contained)
-├── index.html              # GitHub Pages entry point (redirects to inkra.html)
-├── oricas_generator.html   # Legacy URL redirect (previous app name)
+├── inkra.html              # Aplicación completa (HTML + CSS + JS autocontenido)
+├── index.html              # Punto de entrada para GitHub Pages (redirige a inkra.html)
+├── assets/
+│   ├── icon.svg            # Ícono / favicon de la app
+│   └── readme/
+│       └── inkra-logo.svg  # Logo SVG animado del README
 ├── vendor/
-│   └── jspdf.umd.min.js    # Local PDF engine
-├── README.md
-├── .gitattributes
-├── .gitignore
-└── .github/
-    └── workflows/
-        └── deploy.yml      # GitHub Actions — auto-deploy to GitHub Pages
+│   └── jspdf.umd.min.js    # Motor PDF local
+└── .github/workflows/
+    └── deploy.yml          # GitHub Actions — despliegue automático a GitHub Pages
 ```
 
 ---
 
-## Development
+## 🚀 Despliegue en GitHub Pages
 
-There is no build step. Edit `inkra.html` and push — GitHub Actions deploys the repository root to GitHub Pages.
+1. Sube el proyecto a GitHub en la rama `main`.
+2. En **Settings → Pages**, selecciona **Source: GitHub Actions**.
+3. Cada `push` a `main` desplegará automáticamente la raíz del repositorio en `https://<usuario>.github.io/Inkra/`.
 
 ---
 
-## License
+## 📄 Licencia
 
-MIT © 2026 — Free to use and modify.
+MIT © 2026 [theAstroBruh](https://github.com/theastrobruh) — Libre para usar y modificar.
